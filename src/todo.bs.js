@@ -4,6 +4,7 @@
 var Fs = require("fs");
 var Os = require("os");
 var Curry = require("bs-platform/lib/js/curry.js");
+var Caml_array = require("bs-platform/lib/js/caml_array.js");
 
 var getToday = (function() {
   let date = new Date();
@@ -14,18 +15,124 @@ var getToday = (function() {
 
 var encoding = "utf8";
 
-console.log("Hello! today is " + Curry._1(getToday, undefined));
+var getArgs = (function(){
+    return process.argv
+});
 
-if (Fs.existsSync("todo.txt")) {
-  console.log("Todo file exists.");
-} else {
-  Fs.writeFileSync("todo.txt", "This is todo!" + Os.EOL, {
+var args = Curry._1(getArgs, undefined);
+
+var helpStr = "Usage :-\n$ ./todo add \"todo item\"  # Add a new todo\n$ ./todo ls               # Show remaining todos\n$ ./todo del NUMBER       # Delete a todo\n$ ./todo done NUMBER      # Complete a todo\n$ ./todo help             # Show usage\n$ ./todo report           # Statistics";
+
+function readTodos(fileName) {
+  if (!Fs.existsSync(fileName)) {
+    return [];
+  }
+  var data = Fs.readFileSync(fileName, {
         encoding: encoding,
-        flag: "w"
+        flag: "r"
       });
-  console.log("Todo file created.");
+  var todos = data.split("\n");
+  return todos.filter(function (todo) {
+              return todo.length > 0;
+            });
+}
+
+function writeToFile(fileName, text, append) {
+  if (Fs.existsSync(fileName) && append) {
+    Fs.appendFileSync(fileName, text + Os.EOL, {
+          encoding: encoding,
+          flag: "a"
+        });
+  } else {
+    Fs.writeFileSync(fileName, text + Os.EOL, {
+          encoding: encoding,
+          flag: "w"
+        });
+  }
+  
+}
+
+if (args.length === 2 || Caml_array.get(args, 2) === "help") {
+  console.log(helpStr);
+} else if (Caml_array.get(args, 2) === "ls") {
+  var todos = readTodos("todo.txt");
+  if (todos.length === 0) {
+    console.log("There are no pending todos!");
+  } else {
+    var todos$1 = todos.map(function (todo, index) {
+          return "[" + String(index + 1 | 0) + "] " + todo;
+        });
+    var todos$2 = todos$1.reverse();
+    var todos$3 = todos$2.reduce((function (str, todo) {
+            var todo$1 = todo.replace("\r", "");
+            return str + todo$1 + "\n";
+          }), "");
+    console.log(todos$3);
+  }
+} else if (Caml_array.get(args, 2) === "add") {
+  if (args.length === 3) {
+    console.log("Error: Missing todo string. Nothing added!");
+  } else {
+    writeToFile("todo.txt", Caml_array.get(args, 3), true);
+    console.log("Added todo: \"" + Caml_array.get(args, 3) + "\"");
+  }
+} else if (Caml_array.get(args, 2) === "del") {
+  if (args.length === 3) {
+    console.log("Error: Missing NUMBER for deleting todo.");
+  } else {
+    var todos$4 = readTodos("todo.txt");
+    var index = Caml_array.get(args, 3);
+    if (index > todos$4.length || index === "0") {
+      console.log("Error: todo #" + index + " does not exist. Nothing deleted.");
+    } else {
+      var todos$5 = todos$4.filter(function (item, idx) {
+            return (index - 1 | 0) !== idx;
+          });
+      var todos$6 = todos$5.reduce((function (str, todo) {
+              return str + todo + "\n";
+            }), "");
+      Fs.writeFileSync("todo.txt", todos$6, {
+            encoding: encoding,
+            flag: "w"
+          });
+      console.log("Deleted todo #" + index);
+    }
+  }
+} else if (Caml_array.get(args, 2) === "done") {
+  if (args.length === 3) {
+    console.log("Error: Missing NUMBER for marking todo as done.");
+  } else {
+    var todos$7 = readTodos("todo.txt");
+    var index$1 = Caml_array.get(args, 3);
+    if (index$1 > todos$7.length || index$1 === "0") {
+      console.log("Error: todo #" + index$1 + " does not exist.");
+    } else {
+      var completedTodo = Caml_array.get(todos$7, index$1 - 1 | 0);
+      var todos$8 = todos$7.filter(function (item, idx) {
+            return (index$1 - 1 | 0) !== idx;
+          });
+      var todos$9 = todos$8.reduce((function (str, todo) {
+              return str + todo + "\n";
+            }), "");
+      Fs.writeFileSync("todo.txt", todos$9, {
+            encoding: encoding,
+            flag: "w"
+          });
+      writeToFile("done.txt", completedTodo, true);
+      console.log("Marked todo #" + index$1 + " as done.");
+    }
+  }
+} else if (Caml_array.get(args, 2) === "report") {
+  var pendingTodos = readTodos("todo.txt");
+  var completedTodos = readTodos("done.txt");
+  console.log(Curry._1(getToday, undefined) + " Pending : " + String(pendingTodos.length) + " Completed : " + String(completedTodos.length));
 }
 
 exports.getToday = getToday;
 exports.encoding = encoding;
-/*  Not a pure module */
+exports.getArgs = getArgs;
+exports.args = args;
+exports.helpStr = helpStr;
+exports.readTodos = readTodos;
+exports.writeToFile = writeToFile;
+/* args Not a pure module */
